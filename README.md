@@ -19,6 +19,8 @@ pip install -r requirements.txt
 
 ## Experiments
 
-| # | 설명 | LB |
-|---|------|----|
-| 001 | XGBoost Baseline | 0.96414 |
+| # | 설명 | OOF | LB |
+|---|------|-----|-----|
+| 001 | XGBoost Baseline (5F, lr=0.05, 1000est) | 0.96599 | 0.96414 |
+| 002 | +페어와이즈 조합 + TargetEncoder | 0.96525 | — (악화) |
+| 003 | 10-Fold + ES + lr=0.02 + 5000est | **0.96812** | **0.96597** |

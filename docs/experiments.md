@@ -15,9 +15,30 @@
 - **피처**: 원본 19개 (LabelEncoding)
 - **불균형 처리**: sample_weight (balanced)
 - **주요 파라미터**: max_depth=8, lr=0.05, n_estimators=1000, subsample=0.8
-- **CV 점수**: -
+- **OOF 점수**: 0.96599
 - **LB 점수**: 0.96414
 - **비고**: 첫 베이스라인 제출
+
+### EXP-002: Feature Engineering (페어와이즈 조합)
+- **날짜**: 2026-04-06
+- **노트북**: `exp002_fe.ipynb`
+- **모델**: XGBoost (5-Fold, 기존 파라미터)
+- **시도**:
+  - Step 1: Tier 1 조합 4개 (Growth_Stage×Mulching 등) → OOF 0.96591 (-0.00008)
+  - Step 2: +Tier 2 조합 6개 → OOF 0.96569 (-0.00030)
+  - Step 3: +TargetEncoder → OOF 0.96525 (-0.00074)
+- **결론**: 모든 Step에서 베이스라인 대비 악화. LabelEncoding된 조합 피처는 XGBoost에 노이즈로 작용
+
+### EXP-003: 학습 설정 개선
+- **날짜**: 2026-04-06
+- **노트북**: `exp003_training_tuning.ipynb`
+- **피처**: 원본 19개 유지
+- **시도**:
+  - A: 10-Fold (기존 파라미터) → OOF 0.96660 (+0.00061)
+  - B: 5-Fold + ES(200) + lr=0.02 + max_depth=6 + 5000est → OOF 0.96770 (+0.00171)
+  - C: 10-Fold + B 파라미터 → **OOF 0.96812 (+0.00213)**
+- **LB 점수**: 0.96597 (CV-LB 격차: 0.00215)
+- **비고**: Early stopping 거의 미작동 (best_iter ~4900-5000) → estimators 더 늘릴 여지 있음
 
 ---
 
@@ -41,17 +62,15 @@
 
 ## TODO
 
-### Phase 1: 피처 엔지니어링
-- [ ] EXP-002: 도메인 피처 추가 (ET_proxy, water_deficit, heat_stress, drying_force, soil_quality 등)
-- [ ] EXP-003: 페어와이즈 범주형 조합 피처 생성
-- [ ] EXP-004: TargetEncoder 적용 (CV 기반 누수 방지)
+### 즉시
+- [ ] EXP-003C 제출 → LB 확인 (CV-LB 격차 모니터링)
+- [ ] n_estimators 10000으로 확장 (아직 수렴 안 됨)
 
-### Phase 2: 멀티 모델
-- [ ] EXP-005: LightGBM 단일 모델
-- [ ] EXP-006: CatBoost 단일 모델
-- [ ] EXP-007: 3모델 가중 블렌딩 앙상블
+### 멀티 모델
+- [ ] LightGBM 단일 모델 (EXP-003C 설정 기반)
+- [ ] CatBoost 단일 모델
+- [ ] 3모델 가중 블렌딩 앙상블
 
-### Phase 3: 고급 최적화
-- [ ] EXP-008: 원본 데이터 활용 (가중치 결합)
-- [ ] EXP-009: 메타스태킹 (Ridge / LGB 메타러너)
-- [ ] EXP-010: 바이어스 튜닝 (로그공간 / Nelder-Mead)
+### 고급 최적화
+- [ ] 원본 데이터 활용 (가중치 결합)
+- [ ] 바이어스 튜닝 (로그공간 / Nelder-Mead)
