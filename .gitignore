@@ -38,6 +38,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# CatBoost temp
+catboost_info/
+
 # Project specifics
 data/*
 !data/.gitkeep

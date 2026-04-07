@@ -9,36 +9,42 @@
 ## 실험 로그
 
 ### EXP-001: XGBoost Baseline
-- **날짜**: 2026-04-03
+- **날짜**: 2026-04-06
 - **노트북**: `xgb_baseline.ipynb`
-- **모델**: XGBoost (5-Fold StratifiedKFold)
+- **모델**: XGBoost (5-Fold, lr=0.05, max_depth=8, 1000est)
 - **피처**: 원본 19개 (LabelEncoding)
-- **불균형 처리**: sample_weight (balanced)
-- **주요 파라미터**: max_depth=8, lr=0.05, n_estimators=1000, subsample=0.8
-- **OOF 점수**: 0.96599
-- **LB 점수**: 0.96414
-- **비고**: 첫 베이스라인 제출
+- **OOF**: 0.96599 / **LB**: 0.96414 (격차 0.00185)
 
 ### EXP-002: Feature Engineering (페어와이즈 조합)
 - **날짜**: 2026-04-06
 - **노트북**: `exp002_fe.ipynb`
-- **모델**: XGBoost (5-Fold, 기존 파라미터)
-- **시도**:
-  - Step 1: Tier 1 조합 4개 (Growth_Stage×Mulching 등) → OOF 0.96591 (-0.00008)
-  - Step 2: +Tier 2 조합 6개 → OOF 0.96569 (-0.00030)
-  - Step 3: +TargetEncoder → OOF 0.96525 (-0.00074)
-- **결론**: 모든 Step에서 베이스라인 대비 악화. LabelEncoding된 조합 피처는 XGBoost에 노이즈로 작용
+- **시도**: Tier1 조합 4개 → Tier2 6개 → TargetEncoder
+- **결론**: 모든 Step에서 악화. FE 효과 없음
 
 ### EXP-003: 학습 설정 개선
 - **날짜**: 2026-04-06
 - **노트북**: `exp003_training_tuning.ipynb`
-- **피처**: 원본 19개 유지
-- **시도**:
-  - A: 10-Fold (기존 파라미터) → OOF 0.96660 (+0.00061)
-  - B: 5-Fold + ES(200) + lr=0.02 + max_depth=6 + 5000est → OOF 0.96770 (+0.00171)
-  - C: 10-Fold + B 파라미터 → **OOF 0.96812 (+0.00213)**
-- **LB 점수**: 0.96597 (CV-LB 격차: 0.00215)
-- **비고**: Early stopping 거의 미작동 (best_iter ~4900-5000) → estimators 더 늘릴 여지 있음
+- **최적 설정**: 10-Fold + lr=0.02 + max_depth=6 + 5000est + ES(200)
+- **OOF**: 0.96812 / **LB**: 0.96597 (격차 0.00215)
+- **비고**: n_estimators=10000은 효과 없음 (5000에서 수렴 확인)
+
+### EXP-004: 멀티 모델 앙상블
+- **날짜**: 2026-04-07
+- **노트북**: `exp004_multimodel.ipynb`
+- **개별 모델 OOF**: XGB=0.96809, LGB=0.96572, CAT=0.96820
+- **블렌딩 OOF**: 0.96893 (XGB=0.45, LGB=0.10, CAT=0.45)
+- **블렌딩 LB**: 0.96588 (격차 0.00305 — **과적합**)
+- **교훈**: OOF 기반 가중치 최적화가 LB에 일반화 안 됨. LGB 부진(0.96572)으로 블렌딩 기여도 낮음
+
+---
+
+## 스코어 추이
+
+| 실험 | OOF | LB | CV-LB 격차 | 비고 |
+|------|-----|-----|-----------|------|
+| EXP-001 XGB Baseline | 0.96599 | 0.96414 | 0.00185 | |
+| EXP-003C XGB 튜닝 | 0.96812 | **0.96597** | 0.00215 | 현재 LB 최고 |
+| EXP-004 Blend | 0.96893 | 0.96588 | 0.00305 | OOF 과적합 |
 
 ---
 
@@ -50,27 +56,23 @@
 | ensemble-of-solutions | 상위 솔루션 투표 | 조건부 투표 메타-앙상블 | 0.97771 |
 | pairwise-combos | XGB+CB+LGB 5-Fold | 페어와이즈 조합(135개), 도메인 피처(13개), 메타러너 혼합, 바이어스 튜닝 | 0.97906 |
 
-### 공통 패턴
-- 3모델 앙상블 (XGBoost + CatBoost + LightGBM)
-- 페어와이즈 범주형 조합 피처
-- 물리 기반 도메인 피처 (ET_proxy, water_deficit, heat_stress 등)
-- TargetEncoder (CV 기반 누수 방지)
-- 바이어스 튜닝 (로그공간 / Nelder-Mead)
-- 원본 데이터 활용 (가중치 결합)
+---
+
+## 학습된 교훈
+- FE(페어와이즈 조합, TargetEncoder)는 단독 XGBoost에서 효과 없음
+- 학습 설정 개선(10-Fold, 낮은 lr)이 가장 확실한 개선
+- OOF 기반 가중치 최적화는 과적합 위험 → 단순 평균이 더 안전할 수 있음
+- LightGBM이 현재 설정에서 부진 → 튜닝 필요
 
 ---
 
 ## TODO
 
 ### 즉시
-- [ ] EXP-003C 제출 → LB 확인 (CV-LB 격차 모니터링)
-- [ ] n_estimators 10000으로 확장 (아직 수렴 안 됨)
+- [ ] LightGBM 튜닝 (lr 낮추기, estimators 늘리기) — 현재 0.96572로 부진
+- [ ] CatBoost 단독 제출 → LB 확인 (OOF 0.96820)
+- [ ] 균등 블렌딩 (1/3, 1/3, 1/3) 시도 — 과적합 방지
 
-### 멀티 모델
-- [ ] LightGBM 단일 모델 (EXP-003C 설정 기반)
-- [ ] CatBoost 단일 모델
-- [ ] 3모델 가중 블렌딩 앙상블
-
-### 고급 최적화
+### 다음 단계
 - [ ] 원본 데이터 활용 (가중치 결합)
-- [ ] 바이어스 튜닝 (로그공간 / Nelder-Mead)
+- [ ] 바이어스 튜닝
